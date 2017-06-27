@@ -15,6 +15,7 @@ class HypotesisTerm():
     def evaluate_term(self, evaluate_array):
         return self.weight * self.stump_function(evaluate_array[self.stump_column])
 
+
 class AdaBoostClassifier():
     def __init__(self,maximum_iterations):
         self.maximum_iterations = maximum_iterations
@@ -66,7 +67,7 @@ class AdaBoostClassifier():
         for function_number, stump_function in enumerate(stump_functions):
             weighted_error = 0.0
             for index, x_value in enumerate(x_stump_column):
-                if stump_function(x_value) == y[index]:
+                if stump_function(x_value) != y[index]:
                     weighted_error += self.value_weights[index]
             weighted_error = weighted_error/sum(self.value_weights)
             if weighted_error < min_weighted_error:
@@ -127,4 +128,4 @@ y = parsed_data[:, -1]
 
 model.fit(X, y)
 
-print model.predict(parsed_data[626, :-1])
+print model.predict(parsed_data[-2, :-1])
