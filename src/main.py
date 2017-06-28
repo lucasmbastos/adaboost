@@ -1,16 +1,14 @@
 import numpy as np
 import math
 import operator
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 
 class HypotesisTerm():
     def __init__(self, weight, stump_column, stump_function):
         self.weight = weight
         self.stump_column = stump_column
         self.stump_function = stump_function
-
-        print "weight"
-        print self.weight
-        print self.stump_column
 
     def evaluate_term(self, evaluate_array):
         return self.weight * self.stump_function(evaluate_array[self.stump_column])
@@ -56,8 +54,8 @@ class AdaBoostClassifier():
         self.__update_value_weights(min_weighted_error, y, selected_function, x_stump_column_selected)
 
     def __generate_stump_functions(self, value_condiction):
-        positive_stump = lambda x: 1 if x == value_condiction else 0
-        negative_stump = lambda x: 0 if x == value_condiction else 1
+        positive_stump = lambda x: 1 if x == value_condiction else -1
+        negative_stump = lambda x: 1 if x != value_condiction else -1
         return(positive_stump, negative_stump)
 
     def __get_weighted_error(self, x_stump_column, y, stump_functions):
@@ -97,15 +95,15 @@ class AdaBoostClassifier():
         self.value_weights = map(lambda x: x/value_weights_sum, self.value_weights)
 
     def predict(self, X):
-        X = np.array(list(X))
-        
-        predicts = []
-        for x in X:
-            predicts.append(reduce(operator.add, map(lambda y: y.evaluate_term(X), self.model_terms)))
-        return np.asarray(predicts)
+        return 1 if reduce(operator.add, map(lambda y: y.evaluate_term(X), self.model_terms)) >= 0 else -1
+
+    def predict_array(self, X):
+        return [self.predict(x) for x in X]
 
 def parse_data(element):
-    if element == 'b' or element == 'negative':
+    if element == 'negative':
+        return -1
+    if element == 'b':
         return 0
     if element == 'x' or element == 'positive':
         return 1
@@ -121,11 +119,13 @@ data = np.genfromtxt("../data/tic-tac-toe.data.txt", delimiter=",", dtype=None)
 # Convert data
 parsed_data = parse_matrix(data)
 
-model = AdaBoostClassifier(50)
+model = AdaBoostClassifier(2000)
 
 X = parsed_data[:, :-1]
 y = parsed_data[:, -1]
 
-model.fit(X, y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=13)
+model.fit(X_train, y_train)
 
-print model.predict(parsed_data[-2, :-1])
+y_pred = model.predict_array(X_test)
+print accuracy_score(y_test, y_pred)
