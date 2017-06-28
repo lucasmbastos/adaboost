@@ -25,12 +25,16 @@ class AdaBoostClassifier():
         for iteration in xrange(self.maximum_iterations):
             self.__iterate_training(X, y)
 
+    def fit_with_training_error(self, X, y):
+        self.fit(X,y)
+        return self.predict_array(X)
+
     def __generate_stump_combinations(self, X):
         self.stump_combinations = [(column,column_value) for column in range(X.shape[1]) for column_value in range(3)]
 
     def __generate_value_weights(self, X):
         line, columns = X.shape
-        self.value_weights = np.ones((line)) * 1/float(line)
+        self.value_weights = np.ones((line)) * 1.0/float(line)
 
     def __iterate_training(self, X, y):
         
@@ -50,8 +54,8 @@ class AdaBoostClassifier():
                 column_selected = stump_column
                 x_stump_column_selected = x_stump_column
 
-        self.__append_model_term(min_weighted_error, column_selected, selected_function)
-        self.__update_value_weights(min_weighted_error, y, selected_function, x_stump_column_selected)
+        term_weight = self.__append_model_term(min_weighted_error, column_selected, selected_function)
+        self.__update_value_weights(term_weight, y, selected_function, x_stump_column_selected)
 
     def __generate_stump_functions(self, value_condiction):
         positive_stump = lambda x: 1 if x == value_condiction else -1
@@ -61,7 +65,6 @@ class AdaBoostClassifier():
     def __get_weighted_error(self, x_stump_column, y, stump_functions):
         min_weighted_error = float("Inf")
         choosen_stump_function = None
-        
         for function_number, stump_function in enumerate(stump_functions):
             weighted_error = 0.0
             for index, x_value in enumerate(x_stump_column):
@@ -75,8 +78,9 @@ class AdaBoostClassifier():
         return min_weighted_error, choosen_stump_function
     
     def __append_model_term(self, weighted_error, column, stump_function):
-        weight = (1.0/2.0) * math.log10((1.0 - weighted_error)/(weighted_error))
+        weight = 0.5 * math.log((1.0 - weighted_error)/(weighted_error))
         self.model_terms.append(HypotesisTerm(weight, column, stump_function))
+        return weight
 
     def __update_value_weights(self, weighted_error, y, stump_function, x_column):
 
@@ -87,7 +91,7 @@ class AdaBoostClassifier():
         for index, value_weight in enumerate(self.value_weights):
             if stump_function(x_column[index]) == y[index]:
                 self.value_weights[index] = value_weight * math.exp(-weighted_error)
-            if stump_function(x_column[index]) != y[index]:
+            elif stump_function(x_column[index]) != y[index]:
                 self.value_weights[index] = value_weight * math.exp(weighted_error)
 
     def __normalize_value_weights(self):
@@ -119,13 +123,30 @@ data = np.genfromtxt("../data/tic-tac-toe.data.txt", delimiter=",", dtype=None)
 # Convert data
 parsed_data = parse_matrix(data)
 
-model = AdaBoostClassifier(2000)
+import matplotlib.pyplot as plt
+plt.style.use('ggplot')
 
-X = parsed_data[:, :-1]
-y = parsed_data[:, -1]
+start_iteration = 10
+end_iteration = 100
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=13)
-model.fit(X_train, y_train)
+error_test = []
+error_training = []
+for n_iterations in xrange(start_iteration, end_iteration, 10):
+    print("Iteration %d" % n_iterations)
+    model = AdaBoostClassifier(n_iterations)
 
-y_pred = model.predict_array(X_test)
-print accuracy_score(y_test, y_pred)
+    X = parsed_data[:, :-1]
+    y = parsed_data[:, -1]
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=13)
+    training_predictions = model.fit_with_training_error(X_train, y_train)
+    error_training.append(1-accuracy_score(y_train, training_predictions))
+    y_pred = model.predict_array(X_test)
+    error_test.append(1-accuracy_score(y_test, y_pred))
+
+plt.plot(error_training)
+plt.plot(error_test)
+plt.xticks(np.arange(start_iteration, end_iteration+1, 1.0))
+
+plt.legend(['Trainging Error', 'Test Error'], loc='upper left')
+plt.show()
